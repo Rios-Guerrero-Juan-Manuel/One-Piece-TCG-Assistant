@@ -1,0 +1,17 @@
+{
+  "app.title": "One Piece TCG Assistant",
+  "nav.dashboard": "Dashboard",
+  "nav.deck_builder": "Constructor de Mazos",
+  "nav.match_analyzer": "Analizador de Partidas",
+  "nav.collection": "Coleccion",
+  "nav.meta_report": "Meta Report",
+  "nav.settings": "Configuracion",
+  "common.search": "Buscar",
+  "common.import": "Importar",
+  "common.export": "Exportar",
+  "common.save": "Guardar",
+  "common.cancel": "Cancelar",
+  "common.loading": "Cargando...",
+  "common.error": "Error",
+  "health.ok": "Sistema operativo"
+}

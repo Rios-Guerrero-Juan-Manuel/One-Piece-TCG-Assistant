@@ -1,0 +1,11 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend/data:/app/backend/data
+      - ../Datos:/app/Datos:ro
+    restart: unless-stopped

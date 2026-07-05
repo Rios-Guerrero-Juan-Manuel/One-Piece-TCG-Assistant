@@ -1,0 +1,96 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+.venv/
+env/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime data (preserve directory structure via .gitkeep)
+backend/data/*
+!backend/data/.gitkeep
+!backend/data/logs/
+!backend/data/exports/
+!backend/data/imports/
+!backend/data/chroma/
+
+backend/data/logs/*
+!backend/data/logs/.gitkeep
+
+backend/data/exports/*
+!backend/data/exports/.gitkeep
+
+backend/data/imports/*
+!backend/data/imports/.gitkeep
+
+backend/data/chroma/*
+!backend/data/chroma/.gitkeep
+
+# Logs
+*.log
+
+# Backups (never tracked)
+backend/data_backup/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.hypothesis/
+
+# Alembic
+backend/alembic/versions/__pycache__/
+
+# Personal game data (PII + copyrighted assets)
+Datos/
+!Datos/.gitkeep
+!Datos/README.md
+
+# Internal planning docs
+AGENTS.md
+Arquitectura.md
+Plan-Ejecucion.md
+Plan-Implementacion.md
+
+# Archives
+*.zip
+
+# Debug artifacts
+.playwright-mcp/
+/*.png
+/*.txt
