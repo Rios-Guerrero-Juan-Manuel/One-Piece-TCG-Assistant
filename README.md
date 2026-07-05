@@ -37,7 +37,7 @@ this app turns your game data into insights:
 | Feature | What it means |
 |---|---|
 | **Match Analyzer** | Upload your match logs and see a turn-by-turn breakdown: what was played, attacks, counters, DON usage, and who won. |
-| **Deck Builder** | Paste a deck list (e.g. from the simulator), and the app checks if it's legal, scores it, and suggests missing cards. You can also create multiple versions of a deck under the same leader. |
+| **Deck Builder** | Paste a deck list (e.g. from the simulator), and the app checks if it's legal, scores it, track which cards you're missing based on your collection, estimate the cost to complete the deck using Cardmarket prices. You can also create multiple versions of a deck under the same leader. |
 | **Dashboard** | See your overall win rate, best leaders, most-played cards, and patterns in your play (e.g. "you lose too often when falling behind early"). |
 | **Collection Manager** | Import your card collection from a CSV file (Collectr format) and see what you own. |
 | **Meta Report** | See which leaders and decks are popular, their win rates, and how matchups compare. |
