@@ -49,9 +49,6 @@ machine.
 
 ## Screenshots
 
-> **Placeholder** — Replace the files in `docs/screenshots/` with actual
-> screenshots of your app.
-
 | Dashboard | Dashboard (cont.) | Match Analyzer |
 |---|---|---|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Dashboard 2](docs/screenshots/dashboard2.png) | ![Match Analyzer](docs/screenshots/match-analyzer.png) |
