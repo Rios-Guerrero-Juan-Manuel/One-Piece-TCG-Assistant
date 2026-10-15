@@ -8,12 +8,10 @@ from sqlalchemy import select
 from app.domain.engines.match.turn_analyzer import TurnAnalyzer
 from app.domain.models import Action, Match
 from app.domain.parser.match_parser import MatchParser, _normalize_user, _user_is_self
+from app.infrastructure.persistence import session as _persistence_session
 from app.infrastructure.persistence.models import CardORM, MatchORM, MatchTurnORM
-from app.infrastructure.persistence.session import SessionLocal, init_db
 
 logger = logging.getLogger(__name__)
-
-LOGS_DIR = Path(__file__).resolve().parents[4] / "Datos" / "CombatLogs"
 
 
 def extract_match_date(source_file: str) -> datetime.datetime | None:
@@ -139,11 +137,18 @@ class MatchImporter:
 
     def import_directory(
         self,
-        directory: Path | None = None,
+        directory: Path,
         self_user: str | None = None,
+        skip_existing: bool = True,
     ) -> dict:
-        init_db()
-        directory = directory or LOGS_DIR
+        """Import every ``.txt``/``.log`` file found in ``directory``.
+
+        Scans the directory root plus its ``AutoSaved`` subfolder (the layout
+        the OPTCG Simulator uses). With ``skip_existing`` (default), files whose
+        stem is already stored as a ``match_id`` are skipped, so repeated syncs
+        only process new logs.
+        """
+        _persistence_session.init_db()
         all_files = []
         for f in sorted(directory.iterdir()):
             if f.is_file() and f.suffix in (".txt", ".log"):
@@ -154,9 +159,21 @@ class MatchImporter:
                 if f.is_file() and f.suffix in (".txt", ".log"):
                     all_files.append(f)
 
+        existing_ids: set[str] = set()
+        if skip_existing:
+            session = _persistence_session.SessionLocal()
+            try:
+                existing_ids = set(session.scalars(select(MatchORM.match_id)).all())
+            finally:
+                session.close()
+
         imported = 0
+        skipped = 0
         errors = 0
         for f in all_files:
+            if skip_existing and f.stem in existing_ids:
+                skipped += 1
+                continue
             try:
                 m = self.import_file(f, self_user=self_user)
                 if m:
@@ -165,10 +182,15 @@ class MatchImporter:
                 logger.exception("Failed to import %s", f)
                 errors += 1
 
-        return {"imported": imported, "errors": errors, "total": len(all_files)}
+        return {
+            "imported": imported,
+            "skipped": skipped,
+            "errors": errors,
+            "total": len(all_files),
+        }
 
     def _save(self, match: Match, self_user: str | None = None) -> None:
-        session = SessionLocal()
+        session = _persistence_session.SessionLocal()
         try:
             existing = session.get(MatchORM, match.match_id)
             if existing:

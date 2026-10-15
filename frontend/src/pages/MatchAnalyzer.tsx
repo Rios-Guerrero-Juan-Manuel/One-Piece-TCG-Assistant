@@ -5,6 +5,7 @@ import {
   getMatch,
   importMatch,
   importMatchesBatch,
+  importDirectory,
   assignMatchDeck,
   autoAssignMatchDeck,
   type MatchListItem,
@@ -43,6 +44,15 @@ export default function MatchAnalyzer() {
   const [selfUserConfigured, setSelfUserConfigured] = useState<boolean | null>(null)
   const [hasDecks, setHasDecks] = useState<boolean | null>(null)
 
+  const [logsDir, setLogsDir] = useState<string | null>(null)
+  const [lastSync, setLastSync] = useState<{ when: string | null; result: SyncResultInfo | null }>({
+    when: null,
+    result: null,
+  })
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+  const [syncErr, setSyncErr] = useState('')
+
   const loadList = useCallback(async () => {
     setLoadingList(true)
     setError('')
@@ -67,6 +77,51 @@ export default function MatchAnalyzer() {
       .then((s) => setSelfUserConfigured(!!(s.self_user && s.self_user.trim())))
       .catch(() => setSelfUserConfigured(false))
   }, [])
+
+  const loadSyncStatus = useCallback(async () => {
+    try {
+      const s = await getSettings()
+      setLogsDir(s.logs_dir?.trim() || null)
+      let result: SyncResultInfo | null = null
+      if (s.last_logs_sync_result) {
+        try {
+          result = JSON.parse(s.last_logs_sync_result) as SyncResultInfo
+        } catch {
+          result = null
+        }
+      }
+      setLastSync({ when: s.last_logs_sync || null, result })
+    } catch (err) {
+      console.error('Failed to load sync status', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSyncStatus()
+  }, [loadSyncStatus])
+
+  const handleSyncNow = async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    setSyncErr('')
+    try {
+      const r = await importDirectory()
+      setSyncMsg(
+        t('match_analyzer.sync_result')
+          .replace('{imported}', String(r.imported))
+          .replace('{skipped}', String(r.skipped))
+          .replace('{errors}', String(r.errors)),
+      )
+      await loadList()
+      await loadSyncStatus()
+    } catch (err) {
+      console.error('Sync failed', err)
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setSyncErr(detail || t('match_analyzer.sync_error'))
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   useEffect(() => {
     getDecks()
@@ -249,6 +304,65 @@ export default function MatchAnalyzer() {
           </Link>
         </div>
       )}
+
+      {/* Auto-sync status */}
+      <div
+        className="card"
+        style={{
+          padding: '0.75rem 1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+          <strong style={{ fontSize: '0.85rem', color: 'var(--accent)' }}>
+            {t('match_analyzer.autosync_title')}
+          </strong>
+          {logsDir ? (
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all' }}>
+              {logsDir}
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              {t('match_analyzer.configure_folder')}
+            </div>
+          )}
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            {lastSync.when
+              ? t('match_analyzer.last_sync').replace('{when}', formatPlayedAt(lastSync.when))
+              : t('match_analyzer.never_synced')}
+            {lastSync.result?.status === 'ok' && (
+              <span>
+                {' · '}
+                {t('match_analyzer.sync_result')
+                  .replace('{imported}', String(lastSync.result.imported ?? 0))
+                  .replace('{skipped}', String(lastSync.result.skipped ?? 0))
+                  .replace('{errors}', String(lastSync.result.errors ?? 0))}
+              </span>
+            )}
+            {lastSync.result?.status === 'invalid_path' && (
+              <span style={{ color: 'var(--error)' }}> · {lastSync.result.path}</span>
+            )}
+          </div>
+        </div>
+        <button
+          className="btn"
+          onClick={handleSyncNow}
+          disabled={syncing || !logsDir}
+          style={{ flexShrink: 0, opacity: syncing || !logsDir ? 0.6 : 1 }}
+        >
+          {syncing ? t('match_analyzer.syncing') : t('match_analyzer.sync_now')}
+        </button>
+        {syncMsg && (
+          <span style={{ color: 'var(--success)', fontSize: '0.78rem', flexBasis: '100%' }}>{syncMsg}</span>
+        )}
+        {syncErr && (
+          <span style={{ color: 'var(--error)', fontSize: '0.78rem', flexBasis: '100%' }}>{syncErr}</span>
+        )}
+      </div>
 
       {/* Import section */}
       {selfUserConfigured === false ? (
@@ -658,6 +772,15 @@ export default function MatchAnalyzer() {
 }
 
 type TFunc = (key: string, fallback?: string) => string
+
+interface SyncResultInfo {
+  status: string
+  imported?: number
+  skipped?: number
+  errors?: number
+  total?: number
+  path?: string
+}
 
 function readNum(state: Record<string, unknown>, ...keys: string[]): number | null {
   for (const k of keys) {

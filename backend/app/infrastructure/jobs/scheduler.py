@@ -71,15 +71,6 @@ class JobScheduler:
         )
 
         scheduler.add_job(
-            self._import_new_logs,
-            "cron",
-            hour=12,
-            minute=0,
-            id="import_new_logs",
-            replace_existing=True,
-        )
-
-        scheduler.add_job(
             self._refresh_prices,
             "cron",
             hour=5,
@@ -147,39 +138,6 @@ class JobScheduler:
             logger.info("Embeddings rebuilt: %d cards", count)
         except Exception:
             logger.error("Embeddings rebuild failed", exc_info=True)
-
-    async def _import_new_logs(self) -> None:
-        try:
-            from app.core.config import settings
-            from app.infrastructure.persistence.repositories.settings_repo import (
-                SettingsRepository,
-            )
-
-            session = SessionLocal()
-            try:
-                repo = SettingsRepository(session)
-                self_user = repo.get("self_user", settings.self_user) or None
-            finally:
-                session.close()
-
-            if not self_user:
-                logger.warning(
-                    "Skipping log import — self_user is not configured. "
-                    "Set it in Settings to enable automatic imports."
-                )
-                return
-
-            from app.infrastructure.importers.match_importer import MatchImporter
-            importer = MatchImporter()
-            result = importer.import_directory(self_user=self_user)
-            logger.info(
-                "Logs imported: %d new, %d errors of %d total",
-                result.get("imported", 0),
-                result.get("errors", 0),
-                result.get("total", 0),
-            )
-        except Exception:
-            logger.error("Log import failed", exc_info=True)
 
     async def _refresh_prices(self) -> None:
         try:

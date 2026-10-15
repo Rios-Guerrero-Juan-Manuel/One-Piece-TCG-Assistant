@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSettings, updateSettings } from '../api/settings'
+import { getSettings, updateSettings, validateLogsDir } from '../api/settings'
 import { useI18n } from '../i18n/context'
 
 export default function Settings() {
@@ -7,6 +7,8 @@ export default function Settings() {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [validating, setValidating] = useState(false)
+  const [validation, setValidation] = useState<{ ok: boolean; msg: string } | null>(null)
 
   useEffect(() => {
     loadSettings()
@@ -27,6 +29,34 @@ export default function Settings() {
   const handleChange = (key: string, value: string) => {
     setSettings(prev => ({ ...prev, [key]: value }))
     setSaved(false)
+    if (key === 'logs_dir') setValidation(null)
+  }
+
+  const handleValidateLogsDir = async () => {
+    const path = (settings.logs_dir || '').trim()
+    if (!path) {
+      setValidation(null)
+      return
+    }
+    setValidating(true)
+    try {
+      const r = await validateLogsDir(path)
+      if (!r.exists || !r.is_dir) {
+        setValidation({ ok: false, msg: t('settings.logs_dir_invalid') })
+      } else {
+        setValidation({
+          ok: true,
+          msg: t('settings.logs_dir_valid')
+            .replace('{files}', String(r.files_found))
+            .replace('{autosaved}', String(r.autosaved_found)),
+        })
+      }
+    } catch (err) {
+      console.error('Failed to validate logs dir', err)
+      setValidation({ ok: false, msg: t('settings.logs_dir_invalid') })
+    } finally {
+      setValidating(false)
+    }
   }
 
   const handleSave = async () => {
@@ -72,6 +102,34 @@ export default function Settings() {
             <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {t('settings.self_user_help')}
             </p>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('settings.logs_dir')}</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={settings.logs_dir || ''}
+                onChange={(e) => handleChange('logs_dir', e.target.value)}
+                placeholder={t('settings.logs_dir_placeholder')}
+                style={inputStyle}
+              />
+              <button
+                className="btn"
+                onClick={handleValidateLogsDir}
+                disabled={validating || !(settings.logs_dir || '').trim()}
+                style={{ flexShrink: 0, opacity: validating || !(settings.logs_dir || '').trim() ? 0.6 : 1 }}
+              >
+                {validating ? t('settings.validating') : t('settings.validate')}
+              </button>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              {t('settings.logs_dir_help')}
+            </p>
+            {validation && (
+              <p style={{ fontSize: '0.78rem', marginTop: '4px', color: validation.ok ? 'var(--success)' : 'var(--error)' }}>
+                {validation.msg}
+              </p>
+            )}
           </div>
           <div>
             <label style={{ display: 'block', marginBottom: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('settings.active_format')}</label>

@@ -91,6 +91,7 @@ export interface FileImportResultEntry {
 
 export interface BatchImportResult {
   imported: number
+  skipped: number
   errors: number
   total: number
   results: FileImportResultEntry[]

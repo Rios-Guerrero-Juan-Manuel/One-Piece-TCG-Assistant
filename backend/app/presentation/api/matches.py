@@ -372,24 +372,44 @@ async def import_matches_batch(
 
 @router.post("/import-directory", response_model=BatchImportResponse)
 async def import_directory(db: Session = Depends(get_db)):
-    self_user = _require_self_user(db)
+    """Sync match logs from the simulator folder configured in Settings.
 
-    importer = MatchImporter()
-    result = importer.import_directory(self_user=self_user)
-
-    all_matches = list(db.scalars(select(MatchORM)))
-    for m in all_matches:
-        if m.deck_id_self is None and m.leader_self:
-            match_date = extract_match_date(m.source_file) if m.source_file else None
-            m.deck_id_self = DeckRepository(db).auto_assign_deck(m.leader_self, match_date)
-    db.commit()
-
-    get_event_bus().publish(
-        "MatchImported",
-        MatchImported(match_id="batch"),
+    Only files not already imported are processed (dedup by match id).
+    """
+    from app.application.services.logs_sync_service import (
+        STATUS_INVALID_PATH,
+        STATUS_NO_SELF_USER,
+        STATUS_NOT_CONFIGURED,
+        LogsSyncService,
     )
 
-    return BatchImportResponse(**result)
+    service = LogsSyncService()
+    summary = service.sync()
+    status = summary.get("status")
+
+    if status == STATUS_NOT_CONFIGURED:
+        raise HTTPException(
+            status_code=400,
+            detail="No simulator logs folder configured. Set it in Settings.",
+        )
+    if status == STATUS_INVALID_PATH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Configured logs folder does not exist: {summary.get('path', '')}",
+        )
+    if status == STATUS_NO_SELF_USER:
+        raise HTTPException(
+            status_code=400,
+            detail="You must configure your simulator username in Settings "
+            "before importing matches.",
+        )
+
+    return BatchImportResponse(
+        imported=summary.get("imported", 0),
+        skipped=summary.get("skipped", 0),
+        errors=summary.get("errors", 0),
+        total=summary.get("total", 0),
+    )
 
 
 @router.put("/{match_id}/deck-assignment")

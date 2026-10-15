@@ -103,18 +103,37 @@ async def _ensure_cards_loaded() -> None:
     await asyncio.to_thread(_sync_ensure_cards_loaded)
 
 
+def _sync_startup_logs() -> None:
+    """Import new simulator logs from the configured folder (best effort)."""
+    if _shutdown_event.is_set():
+        return
+    try:
+        from app.application.services.logs_sync_service import LogsSyncService
+
+        summary = LogsSyncService().sync()
+        logger.info("Startup logs sync: %s", summary)
+    except Exception:
+        logger.error("Startup logs sync failed", exc_info=True)
+
+
+async def _sync_logs_on_startup() -> None:
+    await asyncio.to_thread(_sync_startup_logs)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
     init_db_safe()
     wire_event_bus()
     get_scheduler().start()
-    task = asyncio.create_task(_ensure_cards_loaded())
+    cards_task = asyncio.create_task(_ensure_cards_loaded())
+    logs_task = asyncio.create_task(_sync_logs_on_startup())
     yield
     _shutdown_event.set()
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
+    for task in (cards_task, logs_task):
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
     get_scheduler().shutdown()
 
 

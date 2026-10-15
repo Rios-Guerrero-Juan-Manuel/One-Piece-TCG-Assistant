@@ -97,6 +97,7 @@ class FileImportResult(BaseModel):
 
 class BatchImportResponse(BaseModel):
     imported: int
+    skipped: int = 0
     errors: int
     total: int
     results: list[FileImportResult] = []
