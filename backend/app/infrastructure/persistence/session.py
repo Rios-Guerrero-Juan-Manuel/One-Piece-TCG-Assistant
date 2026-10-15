@@ -1,10 +1,11 @@
 from collections.abc import Generator
-from pathlib import Path
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-DB_PATH = Path(__file__).resolve().parents[3] / "data" / "optcg.db"
+from app.core.paths import data_dir
+
+DB_PATH = data_dir() / "optcg.db"
 
 engine: Engine = create_engine(
     f"sqlite:///{DB_PATH}",
@@ -22,6 +23,6 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 def init_db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     from app.infrastructure.persistence.models import Base
     Base.metadata.create_all(engine)
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)

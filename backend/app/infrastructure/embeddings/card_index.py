@@ -1,19 +1,23 @@
 import logging
-from pathlib import Path
 
 import chromadb
+from chromadb.config import Settings as ChromaSettings
+
+from app.core.paths import data_dir
 
 logger = logging.getLogger(__name__)
 
-CHROMA_PATH = str(Path(__file__).resolve().parents[3] / "data" / "chroma")
+CHROMA_PATH = str(data_dir() / "chroma")
 COLLECTION_NAME = "cards"
+
+_NO_TELEMETRY = ChromaSettings(anonymized_telemetry=False)
 
 
 class CardIndex:
     def __init__(self, path: str = CHROMA_PATH, collection_name: str = COLLECTION_NAME):
         self.path = path
         self.collection_name = collection_name
-        self._client = chromadb.PersistentClient(path=path)
+        self._client = chromadb.PersistentClient(path=path, settings=_NO_TELEMETRY)
         self._collection = self._client.get_or_create_collection(
             name=collection_name,
             metadata={"hnsw:space": "cosine"},

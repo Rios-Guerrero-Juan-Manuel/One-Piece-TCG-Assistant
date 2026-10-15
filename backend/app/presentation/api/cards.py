@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.application.services.matching_service import MatchingService
-from app.core.config import BASE_DIR
+from app.core.paths import app_root
 from app.infrastructure.persistence.repositories.card_repo import CardRepository
 from app.infrastructure.persistence.session import get_db
 from app.presentation.schemas.card_schema import (
@@ -85,7 +85,7 @@ async def get_similar_cards(
     )
 
 
-_LOCAL_IMAGES = BASE_DIR.parent / "Datos" / "1.40a" / "Cards"
+_LOCAL_IMAGES = app_root() / "Datos" / "1.40a" / "Cards"
 
 
 @router.get("/{card_id}/image")

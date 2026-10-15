@@ -90,6 +90,10 @@ Plan-Implementacion.md
 # Archives
 *.zip
 
+# Windows portable build artifacts
+deploy/windows/cache/
+releases/
+
 # Debug artifacts
 .playwright-mcp/
 /*.png

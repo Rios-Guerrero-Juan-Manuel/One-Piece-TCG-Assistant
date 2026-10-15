@@ -2,12 +2,13 @@ import json
 import logging
 from pathlib import Path
 
+from app.core.paths import app_root
 from app.infrastructure.persistence.repositories.format_repo import FormatRepository
 from app.infrastructure.persistence.session import SessionLocal, init_db
 
 logger = logging.getLogger(__name__)
 
-FORMATS_DIR = Path(__file__).resolve().parents[4] / "Datos" / "1.40a" / "Formats"
+FORMATS_DIR = app_root() / "Datos" / "1.40a" / "Formats"
 
 
 class FormatImporter:

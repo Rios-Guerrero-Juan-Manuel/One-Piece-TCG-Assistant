@@ -4,7 +4,6 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +13,7 @@ from starlette.responses import Response
 
 from app.application.logging_config import setup_logging
 from app.application.wire_events import wire_event_bus
+from app.core.paths import app_root
 from app.infrastructure.jobs.scheduler import get_scheduler
 from app.presentation.api import (
     cards,
@@ -191,6 +191,6 @@ class SPAStaticFiles(StaticFiles):
         return await super().get_response("index.html", scope)
 
 
-frontend_dist = Path(__file__).resolve().parents[3] / "frontend" / "dist"
+frontend_dist = app_root() / "frontend" / "dist"
 if frontend_dist.exists():
     app.mount("/", SPAStaticFiles(directory=str(frontend_dist), html=True), name="frontend")

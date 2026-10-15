@@ -17,6 +17,7 @@ statistical insights — all from your own computer.
 - [What Does This App Do?](#what-does-this-app-do)
 - [Screenshots](#screenshots)
 - [Where to Find Your Match Logs](#where-to-find-your-match-logs)
+- [Installation — Windows Portable (exe)](#installation--windows-portable-exe)
 - [Installation — Easy Route (Docker)](#installation--easy-route-docker)
   - [Step 1: Install Docker](#step-1-install-docker)
   - [Step 2: Start the App](#step-2-start-the-app)
@@ -76,6 +77,39 @@ The exact location depends on where you installed the simulator. You'll see
 files ending in `.log` — these are what the app reads. You don't need to copy
 them anywhere; the app lets you import them directly via drag & drop (see
 [How to Use the App](#how-to-use-the-app)).
+
+---
+
+## Installation — Windows Portable (exe)
+
+The easiest option on Windows: no Docker, no Python, no Node.js.
+
+1. Download **`OnePieceTCGAssistant-<version>-win64.zip`** (see
+   [Releases](../../releases) or ask whoever builds the app)
+2. Right-click → **Extract all...** to any folder (e.g. `C:\OPTCG Assistant`)
+3. Double-click **`OnePieceTCGAssistant.exe`**
+4. The app window opens; your browser launches at <http://localhost:8000>
+   automatically once the server is ready
+
+Your data (matches, decks, collection, settings) is stored in
+`%LOCALAPPDATA%\OnePieceTCGAssistant`, so it survives app updates — just
+replace the folder with a newer version and run the exe again.
+
+> **First start** may take a minute: the app applies its database and
+> downloads the card database (internet needed once). The AI features work
+> fully offline afterwards.
+>
+> **SmartScreen warning:** since the exe is unsigned, Windows may show
+> "Windows protected your PC". Click *More info* → *Run anyway*.
+
+**To stop the app:** close the app window ("Salir") or close it from the
+taskbar. Logs live in `%LOCALAPPDATA%\OnePieceTCGAssistant\logs\`.
+
+For developers, the bundle is built with:
+
+```bash
+python deploy/windows/build_portable.py
+```
 
 ---
 

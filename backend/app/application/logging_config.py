@@ -10,9 +10,9 @@ Both rotate at 10MB, keeping 5 backup files.
 import logging
 import logging.handlers
 
-from app.core.config import BASE_DIR
+from app.core.paths import data_dir
 
-_LOG_DIR = BASE_DIR / "data" / "logs"
+_LOG_DIR = data_dir() / "logs"
 _MAX_BYTES = 10 * 1024 * 1024  # 10MB
 _BACKUP_COUNT = 5
 _CONFIGURED = False
