@@ -11,7 +11,8 @@ Layout of the bundle (everything except the exe lives inside ``runtime/``):
             python/                embedded Python 3.11
             .deps/                 site-packages (torch, chromadb, ...)
             app/                   backend source
-            alembic/               DB migrations
+            migrations/            DB migrations (renamed: must NOT be "alembic",
+                                   it would shadow the alembic package on sys.path)
             frontend/dist/         built React frontend
             Datos/                 format rules (read-only, no personal data)
             models/                sentence-transformers model (offline, slim)
@@ -210,7 +211,12 @@ def step_frontend(skip: bool) -> None:
 
 def step_source() -> None:
     shutil.copytree(REPO_ROOT / "backend" / "app", RUNTIME_DIR / "app", dirs_exist_ok=True)
-    shutil.copytree(REPO_ROOT / "backend" / "alembic", RUNTIME_DIR / "alembic", dirs_exist_ok=True)
+    # Ship as "migrations/" — a folder named "alembic" inside runtime/ would
+    # shadow the real alembic package on sys.path and break migrations.
+    shutil.copytree(REPO_ROOT / "backend" / "alembic", RUNTIME_DIR / "migrations", dirs_exist_ok=True)
+    old = RUNTIME_DIR / "alembic"
+    if old.is_dir():
+        shutil.rmtree(old)
     shutil.copy2(WINDOWS_DIR / "run_app.py", RUNTIME_DIR / "run_app.py")
     for src_rel, dest_rel in DATOS_BUNDLE_ITEMS:
         src = REPO_ROOT / src_rel

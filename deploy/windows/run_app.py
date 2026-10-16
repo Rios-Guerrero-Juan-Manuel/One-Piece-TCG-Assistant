@@ -91,6 +91,7 @@ def main() -> int:
     data_path = Path(os.environ["OPTCG_DATA_DIR"])
     _redirect_output(data_path)
 
+    print("[run_app] booting...", flush=True)
     print(f"[run_app] data dir: {data_path}", flush=True)
 
     try:
@@ -106,6 +107,12 @@ def main() -> int:
             from app.infrastructure.persistence.session import init_db
 
             init_db()
+            # create_all-built DBs have no alembic_version — stamping head
+            # keeps future schema migrations incremental instead of failing.
+            from app.infrastructure.persistence.migrations import stamp_head
+
+            stamp_head()
+            print("[run_app] create_all done — DB stamped at alembic head", flush=True)
         except Exception:
             print("[run_app] create_all failed too", flush=True)
             traceback.print_exc()
@@ -118,10 +125,22 @@ def main() -> int:
     )
     browser.start()
 
-    import uvicorn
+    exit_code = 0
+    try:
+        import uvicorn
 
-    uvicorn.run("app.presentation.main:app", host="127.0.0.1", port=port, log_level="info")
-    return 0
+        uvicorn.run("app.presentation.main:app", host="127.0.0.1", port=port, log_level="info")
+    except KeyboardInterrupt:
+        print("[run_app] interrupted — shutting down", flush=True)
+    except Exception:
+        exit_code = 1
+        print("[run_app] server crashed", flush=True)
+        import traceback
+
+        traceback.print_exc()
+    finally:
+        print("[run_app] server exited", flush=True)
+    return exit_code
 
 
 if __name__ == "__main__":

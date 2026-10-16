@@ -1,9 +1,9 @@
 """Centralized filesystem paths.
 
 - ``app_root()`` is the directory holding bundled read-only resources:
-  the project root in a repo checkout, or the portable bundle root when the
-  app is shipped as a Windows portable folder (frontend/, Datos/, alembic/,
-  models/ live next to app/).
+  the project root in a repo checkout, or the bundle ``runtime/`` directory
+  when the app is shipped as a Windows portable folder (frontend/, Datos/,
+  migrations/, models/ live next to app/).
 - ``data_dir()`` is where user data (SQLite DB, ChromaDB, .env, logs) is
   written. Defaults to ``backend/data`` in development (unchanged legacy
   behavior) and can be redirected with the ``OPTCG_DATA_DIR`` environment
@@ -60,8 +60,14 @@ def default_portable_data_dir() -> Path:
 
 
 def alembic_dir() -> Path:
-    """Locate the alembic migration scripts (dev repo or portable bundle)."""
-    for candidate in (backend_dir() / "alembic", app_root() / "alembic"):
+    """Locate the alembic migration scripts (dev repo or portable bundle).
+
+    The bundle ships them as ``migrations/`` — NOT ``alembic/`` — because a
+    folder named ``alembic`` next to ``app/`` shadows the real alembic
+    package on sys.path (runtime dir is on sys.path), breaking
+    ``import alembic.config``.
+    """
+    for candidate in (backend_dir() / "alembic", app_root() / "migrations"):
         if (candidate / "env.py").exists():
             return candidate
     return backend_dir() / "alembic"

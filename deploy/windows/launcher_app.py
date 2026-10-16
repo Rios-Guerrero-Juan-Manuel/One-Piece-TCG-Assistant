@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import urllib.request
 import webbrowser
 from pathlib import Path
 
@@ -111,6 +112,14 @@ class LauncherApp:
                 fg="#ef4444",
             )
             return
+        # Remove any stale URL file from a previous run BEFORE spawning the
+        # server, otherwise this launcher may read the old URL and declare
+        # "ready" while no server is listening yet.
+        url_file = _data_dir() / "app_url.txt"
+        try:
+            url_file.unlink(missing_ok=True)
+        except OSError:
+            pass
         creationflags = 0x08000000 if os.name == "nt" else 0  # CREATE_NO_WINDOW
         try:
             self.process = subprocess.Popen(  # noqa: S603
@@ -121,23 +130,61 @@ class LauncherApp:
         except OSError as exc:
             self.status.config(text=f"No se pudo iniciar: {exc}", fg="#ef4444")
 
+    def _read_url(self, url_file: Path) -> str:
+        try:
+            return url_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
+
+    def _healthy(self, url: str) -> bool:
+        try:
+            with urllib.request.urlopen(f"{url}/api/health", timeout=2) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    def _death_reason(self, log_file: Path) -> str:
+        base = "El servidor se cerro inesperadamente"
+        try:
+            lines = [
+                line.strip()
+                for line in log_file.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()[-4:]
+                if line.strip()
+            ]
+            if lines:
+                return f"{base}: {' | '.join(lines)[-110:]}"
+        except OSError:
+            pass
+        return base
+
     def _wait_for_url(self) -> None:
         url_file = _data_dir() / "app_url.txt"
+        log_file = _data_dir() / "logs" / "run_app.log"
         deadline = time.monotonic() + URL_WAIT_SECONDS
+        slow_hint_shown = False
         while time.monotonic() < deadline:
             if self.process is not None and self.process.poll() is not None:
-                self._events.put(("status", ("El servidor se cerro inesperadamente", "#ef4444")))
+                self._events.put(("status", (self._death_reason(log_file), "#ef4444")))
                 return
-            if url_file.exists():
-                try:
-                    url = url_file.read_text(encoding="utf-8").strip()
-                except OSError:
-                    url = ""
-                if url:
-                    self.url = url
-                    self._events.put(("status", (f"Servidor listo: {url}", "#22c55e")))
-                    self._events.put(("ready", ""))
-                    return
+            url = self._read_url(url_file)
+            # run_app.py only writes the URL file after /api/health answers
+            # 200, but double-check here so the browser never opens against a
+            # server that is not actually listening.
+            if url and self._healthy(url):
+                self.url = url
+                self._events.put(("status", (f"Servidor listo: {url}", "#22c55e")))
+                self._events.put(("ready", ""))
+                return
+            if not slow_hint_shown and time.monotonic() > deadline - (
+                URL_WAIT_SECONDS - 10
+            ):
+                slow_hint_shown = True
+                self._events.put((
+                    "status",
+                    ("Iniciando servidor... la primera vez puede tardar 1-2 minutos", "#f97316"),
+                ))
             time.sleep(1)
         self._events.put(("status", ("El servidor tardo demasiado en responder", "#f97316")))
 
