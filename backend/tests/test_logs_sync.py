@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -165,10 +166,17 @@ def test_validate_logs_dir_endpoint(client, logs_dir):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data == {"exists": True, "is_dir": True, "files_found": 2, "autosaved_found": 1}
+    assert data == {
+        "exists": True,
+        "is_dir": True,
+        "files_found": 2,
+        "autosaved_found": 1,
+        "hint": None,
+    }
 
+    # Relative missing path -> plain not_found on any platform.
     missing = client.post(
-        "/api/settings/validate-logs-dir", json={"path": "Z:/no/such/dir"}
+        "/api/settings/validate-logs-dir", json={"path": "no/such/dir"}
     )
     assert missing.status_code == 200
     assert missing.json() == {
@@ -176,7 +184,46 @@ def test_validate_logs_dir_endpoint(client, logs_dir):
         "is_dir": False,
         "files_found": 0,
         "autosaved_found": 0,
+        "hint": "not_found",
     }
+
+
+def test_validate_logs_dir_hint_not_a_directory(client, logs_dir):
+    plain_file = logs_dir.parent / "not_a_dir.txt"
+    plain_file.write_text("x", encoding="utf-8")
+
+    response = client.post(
+        "/api/settings/validate-logs-dir", json={"path": str(plain_file)}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is True
+    assert data["is_dir"] is False
+    assert data["hint"] == "not_a_directory"
+
+
+def test_validate_logs_dir_hint_windows_path_on_linux_server(client, monkeypatch):
+    monkeypatch.setattr(os, "name", "posix")
+
+    response = client.post(
+        "/api/settings/validate-logs-dir", json={"path": "E:\\Games\\CombatLogs"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is False
+    assert data["hint"] == "windows_path_on_server"
+
+
+def test_validate_logs_dir_hint_posix_path_on_windows_server(client, monkeypatch):
+    monkeypatch.setattr(os, "name", "nt")
+
+    response = client.post(
+        "/api/settings/validate-logs-dir", json={"path": "/optcg-no-such-path/logs"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["exists"] is False
+    assert data["hint"] == "posix_path_on_windows_server"
 
 
 def test_import_directory_endpoint_requires_logs_dir(client):

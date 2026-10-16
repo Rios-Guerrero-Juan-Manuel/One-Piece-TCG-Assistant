@@ -14,6 +14,7 @@ export interface LogsDirValidation {
   is_dir: boolean
   files_found: number
   autosaved_found: number
+  hint?: string | null
 }
 
 export async function validateLogsDir(path: string): Promise<LogsDirValidation> {

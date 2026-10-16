@@ -42,7 +42,10 @@ export default function Settings() {
     try {
       const r = await validateLogsDir(path)
       if (!r.exists || !r.is_dir) {
-        setValidation({ ok: false, msg: t('settings.logs_dir_invalid') })
+        const hintKey = r.hint && r.hint !== 'not_found'
+          ? `settings.logs_dir_hint_${r.hint}`
+          : null
+        setValidation({ ok: false, msg: hintKey ? t(hintKey) : t('settings.logs_dir_invalid') })
       } else {
         setValidation({
           ok: true,
@@ -53,7 +56,7 @@ export default function Settings() {
       }
     } catch (err) {
       console.error('Failed to validate logs dir', err)
-      setValidation({ ok: false, msg: t('settings.logs_dir_invalid') })
+      setValidation({ ok: false, msg: t('settings.logs_dir_server_error') })
     } finally {
       setValidating(false)
     }

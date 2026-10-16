@@ -18,3 +18,4 @@ class LogsDirValidationResponse(BaseModel):
     is_dir: bool
     files_found: int
     autosaved_found: int
+    hint: str | None = None

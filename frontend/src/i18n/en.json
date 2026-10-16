@@ -271,6 +271,10 @@
   "settings.validating": "Checking...",
   "settings.logs_dir_valid": "Folder OK: {files} log(s) in the folder and {autosaved} in AutoSaved.",
   "settings.logs_dir_invalid": "Folder not found or path is not a directory.",
+  "settings.logs_dir_hint_not_a_directory": "The path exists but is not a folder. Make sure it points to the logs directory (e.g. ...\\CombatLogs).",
+  "settings.logs_dir_hint_windows_path_on_server": "This is a Windows path, but the app server runs on another machine (Linux/Pi/Docker) and cannot see it. Use the app installed on this PC or mount the folder on the server.",
+  "settings.logs_dir_hint_posix_path_on_windows_server": "This is a Linux/Unix path, but the server runs on Windows and cannot see it.",
+  "settings.logs_dir_server_error": "Could not reach the server. Check that the backend is running.",
 
   "stats.spanish": "Spanish",
   "stats.english": "English"

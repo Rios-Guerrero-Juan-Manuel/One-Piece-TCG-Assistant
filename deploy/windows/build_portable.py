@@ -170,23 +170,48 @@ def step_frontend(skip: bool) -> None:
         run([npm, "ci"], cwd=REPO_ROOT / "frontend")
         run([npm, "run", "build"], cwd=REPO_ROOT / "frontend")
         src = REPO_ROOT / "frontend" / "dist"
-    shutil.copytree(src, dist)
+    shutil.copytree(src, dist, dirs_exist_ok=True)
     log("frontend copied")
 
 
 def step_source() -> None:
-    shutil.copytree(REPO_ROOT / "backend" / "app", BUILD_DIR / "app")
-    shutil.copytree(REPO_ROOT / "backend" / "alembic", BUILD_DIR / "alembic")
+    shutil.copytree(REPO_ROOT / "backend" / "app", BUILD_DIR / "app", dirs_exist_ok=True)
+    shutil.copytree(REPO_ROOT / "backend" / "alembic", BUILD_DIR / "alembic", dirs_exist_ok=True)
     shutil.copy2(WINDOWS_DIR / "run_app.py", BUILD_DIR / "run_app.py")
     datos = REPO_ROOT / "Datos"
     if datos.is_dir():
-        shutil.copytree(datos, BUILD_DIR / "Datos")
+        shutil.copytree(datos, BUILD_DIR / "Datos", dirs_exist_ok=True)
     log("source + data copied")
+
+
+def _model_dir_name() -> str:
+    return "models--sentence-transformers--all-MiniLM-L6-v2"
+
+
+def _model_blobs_mb(models_dir: Path) -> float:
+    blobs = models_dir / _model_dir_name() / "blobs"
+    if not blobs.is_dir():
+        return 0.0
+    return sum(f.stat().st_size for f in blobs.glob("*") if f.is_file()) / (1024 * 1024)
 
 
 def step_model() -> None:
     models = BUILD_DIR / "models"
-    models.mkdir()
+    if _model_blobs_mb(models) > 50:
+        log(f"embedding model already present ({_model_blobs_mb(models):.0f} MB)")
+        return
+    models.mkdir(exist_ok=True)
+
+    # Seed from the local HuggingFace cache when available (offline, fast).
+    local_hub = Path.home() / ".cache" / "huggingface" / "hub"
+    if _model_blobs_mb(local_hub) > 50:
+        target = models / _model_dir_name()
+        if target.exists():
+            shutil.rmtree(target)
+        shutil.copytree(local_hub / _model_dir_name(), target)
+        log(f"embedding model seeded from local HF cache ({_model_blobs_mb(models):.0f} MB)")
+        return
+
     run(
         [
             venv_python(),
@@ -226,10 +251,22 @@ def step_launcher_exe() -> None:
 
 
 def step_zip(version: str) -> Path:
-    zip_base = RELEASES_DIR / f"OnePieceTCGAssistant-{version}-win64"
-    archive = shutil.make_archive(str(zip_base), "zip", root_dir=RELEASES_DIR, base_dir=BUILD_DIR.name)
-    log(f"zip created: {archive}")
-    return Path(archive)
+    zip_path = RELEASES_DIR / f"OnePieceTCGAssistant-{version}-win64.zip"
+    # compresslevel=1: the payload (wheels, safetensors, DLLs) barely
+    # compresses further, and level 6 on ~4 GB takes hours.
+    log(f"zipping {BUILD_DIR.name} -> {zip_path.name} (fast deflate)")
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as zf:
+        written = 0
+        next_report = 512 * 1024 * 1024
+        for path in sorted(BUILD_DIR.rglob("*")):
+            if path.is_file():
+                zf.write(path, path.relative_to(RELEASES_DIR))
+                written += path.stat().st_size
+                if written >= next_report:
+                    log(f"  zipped {written / (1024 * 1024):.0f} MB")
+                    next_report += 512 * 1024 * 1024
+    log(f"zip created: {zip_path}")
+    return zip_path
 
 
 def project_version() -> str:

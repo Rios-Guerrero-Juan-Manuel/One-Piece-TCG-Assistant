@@ -271,6 +271,10 @@
   "settings.validating": "Comprobando...",
   "settings.logs_dir_valid": "Carpeta correcta: {files} log(s) en la carpeta y {autosaved} en AutoSaved.",
   "settings.logs_dir_invalid": "No se encontro la carpeta o la ruta no es un directorio.",
+  "settings.logs_dir_hint_not_a_directory": "La ruta existe pero no es una carpeta. Revisa que apunta al directorio de logs (ej: ...\\CombatLogs).",
+  "settings.logs_dir_hint_windows_path_on_server": "Es una ruta de Windows, pero el servidor de la app corre en otra maquina (Linux/Pi/Docker) y no puede verla. Usa la app instalada en este PC o monta la carpeta en el servidor.",
+  "settings.logs_dir_hint_posix_path_on_windows_server": "Es una ruta de Linux/Unix, pero el servidor corre en Windows y no puede verla.",
+  "settings.logs_dir_server_error": "No se pudo contactar con el servidor. Comprueba que el backend esta en marcha.",
 
   "stats.spanish": "Espanol",
   "stats.english": "Ingles"

@@ -1,3 +1,5 @@
+import os
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
@@ -63,11 +65,37 @@ def _count_log_files(directory: Path) -> tuple[int, int]:
     return root, autosaved
 
 
+_WINDOWS_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _path_hint(path: str, exists: bool, is_dir: bool) -> str | None:
+    """Return a diagnostic code when the path cannot be used as a logs dir.
+
+    The interesting case is a platform mismatch: the user typed a path that is
+    valid on their machine (e.g. ``E:\\...``) but the backend runs somewhere
+    else (Raspberry Pi, Docker) where that path can never exist.
+    """
+    if is_dir:
+        return None
+    if exists:
+        return "not_a_directory"
+    looks_windows = bool(_WINDOWS_PATH_RE.match(path)) or path.startswith("\\\\")
+    looks_posix = path.startswith("/")
+    if looks_windows and not os.name == "nt":
+        return "windows_path_on_server"
+    if looks_posix and os.name == "nt":
+        return "posix_path_on_windows_server"
+    return "not_found"
+
+
 @router.post("/validate-logs-dir", response_model=LogsDirValidationResponse)
 async def validate_logs_dir(req: LogsDirValidationRequest):
     """Check a simulator logs folder without saving it.
 
     Reports how many importable log files were found (root + ``AutoSaved/``).
+    When the path cannot be used, ``hint`` explains why (``not_a_directory``,
+    ``windows_path_on_server``, ``posix_path_on_windows_server`` or
+    ``not_found``).
     """
     path = req.path.strip()
     exists = bool(path) and Path(path).exists()
@@ -78,4 +106,5 @@ async def validate_logs_dir(req: LogsDirValidationRequest):
         is_dir=is_dir,
         files_found=root,
         autosaved_found=autosaved,
+        hint=_path_hint(path, exists, is_dir),
     )
