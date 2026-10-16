@@ -91,9 +91,15 @@ The easiest option on Windows: no Docker, no Python, no Node.js.
 4. The app window opens; your browser launches at <http://localhost:8000>
    automatically once the server is ready
 
+The folder only shows the exe and a `runtime/` folder that contains all the
+internals (Python, dependencies, frontend, format rules, offline AI model) —
+leave it next to the exe.
+
 Your data (matches, decks, collection, settings) is stored in
 `%LOCALAPPDATA%\OnePieceTCGAssistant`, so it survives app updates — just
-replace the folder with a newer version and run the exe again.
+replace the folder with a newer version and run the exe again. New card sets
+are picked up automatically: the app refreshes the card database on startup
+when the last refresh is more than 7 days old, and rebuilds its AI index.
 
 > **First start** may take a minute: the app applies its database and
 > downloads the card database (internet needed once). The AI features work
@@ -110,6 +116,11 @@ For developers, the bundle is built with:
 ```bash
 python deploy/windows/build_portable.py
 ```
+
+The bundle ships only app-relevant data (`Datos/1.40a/Formats` format rules
+and a README). Personal files that may exist in a developer's local `Datos/`
+folder — CombatLogs (contain usernames), deck exports, collection CSVs,
+price catalog dumps — are **never** included.
 
 ---
 

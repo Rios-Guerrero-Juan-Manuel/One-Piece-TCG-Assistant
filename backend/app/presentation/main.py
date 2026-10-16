@@ -65,6 +65,7 @@ def _sync_ensure_cards_loaded() -> None:
             importer.import_full(should_stop=_shutdown_event.is_set)
             repo.set("last_card_refresh", datetime.now(UTC).isoformat())
             logger.info("Full card import completed")
+            _notify_cards_refreshed()
         else:
             last_str = repo.get("last_card_refresh")
             if last_str:
@@ -82,6 +83,7 @@ def _sync_ensure_cards_loaded() -> None:
                         datetime.now(UTC).isoformat(),
                     )
                     logger.info("Incremental card import completed")
+                    _notify_cards_refreshed()
                 else:
                     logger.debug("Cards up to date (last refresh: %s)", last_str)
             else:
@@ -93,10 +95,22 @@ def _sync_ensure_cards_loaded() -> None:
                     datetime.now(UTC).isoformat(),
                 )
                 logger.info("Incremental card import completed")
+                _notify_cards_refreshed()
     except Exception:
         logger.error("Card auto-load failed", exc_info=True)
     finally:
         session.close()
+
+
+def _notify_cards_refreshed() -> None:
+    """Publish CardsRefreshed so embeddings/RAG pick up new cards (new sets).
+
+    Without this, cards imported at startup would not be visible to the
+    matcher until the weekly scheduler rebuild ran.
+    """
+    from app.application.event_bus import get_event_bus
+
+    get_event_bus().publish("CardsRefreshed", {})
 
 
 async def _ensure_cards_loaded() -> None:
@@ -120,6 +134,31 @@ async def _sync_logs_on_startup() -> None:
     await asyncio.to_thread(_sync_startup_logs)
 
 
+def _sync_seed_formats() -> None:
+    """Seed the formats table from Datos/1.40a/Formats when it is empty.
+
+    FormatImporter was historically only exercised by tests, so production
+    databases (Pi, portable bundle) shipped with an empty formats table and
+    /api/formats returned nothing. Idempotent: only runs when empty.
+    """
+    try:
+        from app.infrastructure.importers.format_importer import FormatImporter
+        from app.infrastructure.persistence.models import FormatORM
+        from app.infrastructure.persistence.session import SessionLocal
+
+        session = SessionLocal()
+        try:
+            count = session.query(FormatORM).count()
+        finally:
+            session.close()
+        if count:
+            return
+        results = FormatImporter().import_all()
+        logger.info("Seeded formats: %s", results)
+    except Exception:
+        logger.error("Format seed failed", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
@@ -128,9 +167,10 @@ async def lifespan(app: FastAPI):
     get_scheduler().start()
     cards_task = asyncio.create_task(_ensure_cards_loaded())
     logs_task = asyncio.create_task(_sync_logs_on_startup())
+    formats_task = asyncio.create_task(asyncio.to_thread(_sync_seed_formats))
     yield
     _shutdown_event.set()
-    for task in (cards_task, logs_task):
+    for task in (cards_task, logs_task, formats_task):
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task

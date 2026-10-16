@@ -2,9 +2,9 @@
 
 Built into ``OnePieceTCGAssistant.exe`` with PyInstaller (``--onefile
 --noconsole``). It only uses the standard library: it starts the bundled
-embedded Python (``python\\pythonw.exe run_app.py``) as a hidden subprocess,
-waits for the server URL file, opens the browser and offers a clean way to
-stop the app.
+embedded Python (``runtime\\python\\pythonw.exe runtime\\run_app.py``) as a
+hidden subprocess, waits for the server URL file, opens the browser and
+offers a clean way to stop the app.
 """
 
 import os
@@ -24,8 +24,9 @@ if IS_FROZEN:
 else:
     BUNDLE_ROOT = Path(__file__).resolve().parent
 
-PYTHON_EXE = BUNDLE_ROOT / "python" / "pythonw.exe"
-RUN_APP = BUNDLE_ROOT / "run_app.py"
+RUNTIME_DIR = BUNDLE_ROOT / "runtime"
+PYTHON_EXE = RUNTIME_DIR / "python" / "pythonw.exe"
+RUN_APP = RUNTIME_DIR / "run_app.py"
 URL_WAIT_SECONDS = 180
 
 
@@ -98,6 +99,12 @@ class LauncherApp:
         self._poll_events()
 
     def _start_server(self) -> None:
+        if not RUNTIME_DIR.is_dir():
+            self.status.config(
+                text="Instalacion incompleta: falta la carpeta 'runtime' junto al exe",
+                fg="#ef4444",
+            )
+            return
         if not PYTHON_EXE.exists() or not RUN_APP.exists():
             self.status.config(
                 text=f"Instalacion incompleta: falta {PYTHON_EXE.name} o run_app.py",
@@ -108,7 +115,7 @@ class LauncherApp:
         try:
             self.process = subprocess.Popen(  # noqa: S603
                 [str(PYTHON_EXE), str(RUN_APP)],
-                cwd=str(BUNDLE_ROOT),
+                cwd=str(RUNTIME_DIR),
                 creationflags=creationflags,
             )
         except OSError as exc:

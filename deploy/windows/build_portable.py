@@ -3,17 +3,18 @@
 Produces ``releases/OnePieceTCGAssistant-<version>-win64.zip``: a folder the
 end user unzips anywhere and runs via ``OnePieceTCGAssistant.exe``.
 
-Layout of the bundle:
+Layout of the bundle (everything except the exe lives inside ``runtime/``):
     OnePieceTCGAssistant/
         OnePieceTCGAssistant.exe   launcher (tkinter, stdlib only)
-        run_app.py                 backend entry point
-        python/                    embedded Python 3.11
-        .deps/                     site-packages (torch, chromadb, ...)
-        app/                       backend source
-        alembic/                   DB migrations
-        frontend/dist/             built React frontend
-        Datos/                     read-only game data
-        models/                    sentence-transformers model (offline)
+        runtime/
+            run_app.py             backend entry point
+            python/                embedded Python 3.11
+            .deps/                 site-packages (torch, chromadb, ...)
+            app/                   backend source
+            alembic/               DB migrations
+            frontend/dist/         built React frontend
+            Datos/                 format rules (read-only, no personal data)
+            models/                sentence-transformers model (offline, slim)
 
 Usage (from the repo root):
     python deploy/windows/build_portable.py [--skip-frontend] [--skip-deps]
@@ -38,6 +39,7 @@ WINDOWS_DIR = Path(__file__).resolve().parent
 CACHE_DIR = WINDOWS_DIR / "cache"
 RELEASES_DIR = REPO_ROOT / "releases"
 BUILD_DIR = RELEASES_DIR / "OnePieceTCGAssistant"
+RUNTIME_DIR = BUILD_DIR / "runtime"
 BUILD_VENV = CACHE_DIR / "build-venv"
 
 PYTHON_VERSION = "3.11.9"
@@ -57,6 +59,29 @@ Lib\\site-packages
 
 MODEL_REPO = "sentence-transformers/all-MiniLM-L6-v2"
 
+# Only the files sentence-transformers needs for inference. The full repo
+# snapshot (onnx/openvino/tf/rust variants) is ~2.7 GB; these ~90 MB.
+MODEL_ALLOW_PATTERNS = [
+    "config.json",
+    "config_sentence_transformers.json",
+    "modules.json",
+    "sentence_bert_config.json",
+    "model.safetensors",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "special_tokens_map.json",
+    "vocab.txt",
+    "1_Pooling/*",
+]
+
+# Personal / app-irrelevant files that must NOT ship in the bundle:
+# CombatLogs (PII: usernames), deck exports, collection CSVs, price catalog
+# dumps (cardmarket_client downloads its own), sim-only Sets/Messages/Cards.
+DATOS_BUNDLE_ITEMS = [
+    ("Datos/1.40a/Formats", "Datos/1.40a/Formats"),
+    ("Datos/README.md", "Datos/README.md"),
+]
+
 
 def log(msg: str) -> None:
     print(f"[build] {msg}", flush=True)
@@ -74,18 +99,27 @@ def which(name: str) -> str:
     return found
 
 
+def _remove(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
 def reset_build_dir(keep: list[str]) -> None:
     if not BUILD_DIR.exists():
         BUILD_DIR.mkdir(parents=True)
         return
     for child in BUILD_DIR.iterdir():
-        if child.name in keep:
+        if child == RUNTIME_DIR:
+            for sub in RUNTIME_DIR.iterdir():
+                if sub.name in keep:
+                    continue
+                log(f"cleaning runtime/{sub.name}")
+                _remove(sub)
             continue
         log(f"cleaning {child.name}")
-        if child.is_dir():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
+        _remove(child)
 
 
 def download(url: str, dest: Path) -> None:
@@ -119,8 +153,8 @@ def venv_python() -> Path:
 def step_embedded_python() -> None:
     zip_path = CACHE_DIR / f"python-{PYTHON_VERSION}-embed-amd64.zip"
     download(PYTHON_EMBED_URL, zip_path)
-    python_dir = BUILD_DIR / "python"
-    python_dir.mkdir()
+    python_dir = RUNTIME_DIR / "python"
+    python_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(python_dir)
     pth = python_dir / "python311._pth"
@@ -132,7 +166,7 @@ def step_python_deps(skip: bool) -> None:
     if skip:
         log("skipping python deps (--skip-deps)")
         return
-    python_exe = BUILD_DIR / "python" / "python.exe"
+    python_exe = RUNTIME_DIR / "python" / "python.exe"
 
     # Bootstrap pip into the embedded interpreter (the official recipe for
     # the embeddable distribution; the ._pth file already exposes
@@ -141,8 +175,8 @@ def step_python_deps(skip: bool) -> None:
     download(GETPIP_URL, getpip)
     run([python_exe, getpip, "--no-warn-script-location"])
 
-    deps = BUILD_DIR / ".deps"
-    deps.mkdir()
+    deps = RUNTIME_DIR / ".deps"
+    deps.mkdir(parents=True, exist_ok=True)
     run(
         [
             python_exe,
@@ -160,7 +194,7 @@ def step_python_deps(skip: bool) -> None:
 
 
 def step_frontend(skip: bool) -> None:
-    dist = BUILD_DIR / "frontend" / "dist"
+    dist = RUNTIME_DIR / "frontend" / "dist"
     if skip:
         src = REPO_ROOT / "frontend" / "dist"
         if not src.is_dir():
@@ -175,13 +209,21 @@ def step_frontend(skip: bool) -> None:
 
 
 def step_source() -> None:
-    shutil.copytree(REPO_ROOT / "backend" / "app", BUILD_DIR / "app", dirs_exist_ok=True)
-    shutil.copytree(REPO_ROOT / "backend" / "alembic", BUILD_DIR / "alembic", dirs_exist_ok=True)
-    shutil.copy2(WINDOWS_DIR / "run_app.py", BUILD_DIR / "run_app.py")
-    datos = REPO_ROOT / "Datos"
-    if datos.is_dir():
-        shutil.copytree(datos, BUILD_DIR / "Datos", dirs_exist_ok=True)
-    log("source + data copied")
+    shutil.copytree(REPO_ROOT / "backend" / "app", RUNTIME_DIR / "app", dirs_exist_ok=True)
+    shutil.copytree(REPO_ROOT / "backend" / "alembic", RUNTIME_DIR / "alembic", dirs_exist_ok=True)
+    shutil.copy2(WINDOWS_DIR / "run_app.py", RUNTIME_DIR / "run_app.py")
+    for src_rel, dest_rel in DATOS_BUNDLE_ITEMS:
+        src = REPO_ROOT / src_rel
+        dest = RUNTIME_DIR / dest_rel
+        if not src.exists():
+            log(f"WARNING: {src_rel} not found in repo, skipping")
+            continue
+        if src.is_dir():
+            shutil.copytree(src, dest, dirs_exist_ok=True)
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+    log("source + bundle data copied")
 
 
 def _model_dir_name() -> str:
@@ -196,31 +238,22 @@ def _model_blobs_mb(models_dir: Path) -> float:
 
 
 def step_model() -> None:
-    models = BUILD_DIR / "models"
+    models = RUNTIME_DIR / "models"
     if _model_blobs_mb(models) > 50:
         log(f"embedding model already present ({_model_blobs_mb(models):.0f} MB)")
         return
-    models.mkdir(exist_ok=True)
-
-    # Seed from the local HuggingFace cache when available (offline, fast).
-    local_hub = Path.home() / ".cache" / "huggingface" / "hub"
-    if _model_blobs_mb(local_hub) > 50:
-        target = models / _model_dir_name()
-        if target.exists():
-            shutil.rmtree(target)
-        shutil.copytree(local_hub / _model_dir_name(), target)
-        log(f"embedding model seeded from local HF cache ({_model_blobs_mb(models):.0f} MB)")
-        return
+    models.mkdir(parents=True, exist_ok=True)
 
     run(
         [
             venv_python(),
             "-c",
             "from huggingface_hub import snapshot_download; "
-            f"snapshot_download('{MODEL_REPO}', cache_dir=r'{models}')",
+            f"snapshot_download('{MODEL_REPO}', cache_dir=r'{models}', "
+            f"allow_patterns={MODEL_ALLOW_PATTERNS!r})",
         ]
     )
-    log(f"embedding model cached into {models}")
+    log(f"embedding model cached into {models} ({_model_blobs_mb(models):.0f} MB)")
 
 
 def step_launcher_exe() -> None:
