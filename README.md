@@ -84,8 +84,11 @@ them anywhere; the app lets you import them directly via drag & drop (see
 
 The easiest option on Windows: no Docker, no Python, no Node.js.
 
-1. Download **`OnePieceTCGAssistant-<version>-win64.zip`** (see
-   [Releases](../../releases) or ask whoever builds the app)
+> **Requirements:** Windows 10/11 (64-bit). Internet is needed on first
+> start; AI features run fully offline afterwards.
+
+1. Download **`OnePieceTCGAssistant-<version>-win64.zip`** (~600 MB) from the
+   [latest release](../../releases/latest)
 2. Right-click → **Extract all...** to any folder (e.g. `C:\OPTCG Assistant`)
 3. Double-click **`OnePieceTCGAssistant.exe`**
 4. The app window opens; your browser launches at <http://localhost:8000>
